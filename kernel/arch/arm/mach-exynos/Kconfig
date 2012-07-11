@@ -549,6 +549,9 @@ config ANDROID_WIP
 	  This enables 'work in progress' hacks for android issues.
 	  Please remove it later.
 
+config SEC_PRODUCT_SHIP
+	bool "Build with riff-raff PRODUCT_SHIP clauses"
+
 # machine support
 
 menu "EXYNOS4 Machines"

@@ -31,6 +31,9 @@ config CRYPTO_FIPS
 	  this is. Note that CRYPTO_ANSI_CPRNG is required if this
 	  option is selected
 
+config USE_SEC_FIPS_MODE
+	bool "Use SEC FIPS integrity check"
+
 config CRYPTO_FIPS_INTEG_OFFSET
 	hex "FIPS integrity check zImage offset"
         default 0x20000000
