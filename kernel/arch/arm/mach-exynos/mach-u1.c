@@ -6419,6 +6419,25 @@ struct platform_device sec_idpram_pm_device = {
 };
 #endif
 
+/* Exclude the last 4 kB to preserve the kexec hardboot page. */
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+#define RAM_CONSOLE_START 0x7ff00000
+#define RAM_CONSOLE_SIZE  (SZ_1M-SZ_4K)
+
+static struct resource ram_console_resource[] = {
+	{
+		.flags = IORESOURCE_MEM,
+	},
+};
+
+static struct platform_device ram_console_device = {
+	.name          = "ram_console",
+	.id            = -1,
+	.num_resources = ARRAY_SIZE(ram_console_resource),
+	.resource      = ram_console_resource,
+};
+#endif
+
 static struct platform_device *smdkc210_devices[] __initdata = {
 #ifdef CONFIG_SEC_WATCHDOG_RESET
 	&watchdog_reset_device,
@@ -6697,7 +6716,9 @@ static struct platform_device *smdkc210_devices[] __initdata = {
 #ifdef CONFIG_USB_HOST_NOTIFY
 	&s3c_device_usb_otghcd,
 #endif
-
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+	&ram_console_device,
+#endif
 };
 
 #ifdef CONFIG_EXYNOS4_SETUP_THERMAL
@@ -6736,6 +6757,16 @@ static struct s5p_platform_hpd hdmi_hpd_data __initdata = {
 static struct s5p_platform_cec hdmi_cec_data __initdata = {
 
 };
+#endif
+
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+static void __init smdkc210_reserve(void)
+{
+	if (memblock_remove(RAM_CONSOLE_START, RAM_CONSOLE_SIZE) == 0) {
+		ram_console_resource[0].start = RAM_CONSOLE_START;
+		ram_console_resource[0].end   = RAM_CONSOLE_START+RAM_CONSOLE_SIZE-1;
+	}
+}
 #endif
 
 #if defined(CONFIG_S5P_MEM_CMA)
@@ -7368,6 +7399,9 @@ static void __init exynos_init_reserve(void)
 MACHINE_START(SMDKC210, MODEL_NAME)
 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
 	.boot_params	= S5P_PA_SDRAM + 0x100,
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
+	.reserve	= smdkc210_reserve,
+#endif
 	.init_irq	= exynos4_init_irq,
 	.map_io		= smdkc210_map_io,
 	.init_machine	= smdkc210_machine_init,
