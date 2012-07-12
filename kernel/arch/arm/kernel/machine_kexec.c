@@ -119,6 +119,12 @@ void machine_kexec(struct kimage *image)
 	outer_disable();
 	cpu_proc_fin();
 	outer_inv_all();
+#ifndef CONFIG_ARCH_EXYNOS4
+	/* Causes a CPU hang on Exynos 4. */
 	flush_cache_all();
-	cpu_reset(reboot_code_buffer_phys);
+#endif
+
+	/* Must call cpu_reset via physical address since ARMv7 (& v6) stalls the
+	 * pipeline after disabling the MMU. */
+	((typeof(cpu_reset) *)virt_to_phys(cpu_reset))(reboot_code_buffer_phys);
 }
