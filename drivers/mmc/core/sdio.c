@@ -102,7 +102,7 @@ fail:
 	return ret;
 }
 
-static int sdio_read_cccr(struct mmc_card *card)
+static int sdio_read_cccr(struct mmc_card *card, u32 ocr)
 {
 	int ret;
 	int cccr_vsn;
@@ -206,7 +206,6 @@ static int sdio_read_cccr(struct mmc_card *card)
 out:
 	return ret;
 }
-
 static int sdio_enable_wide(struct mmc_card *card)
 {
 	int ret;
