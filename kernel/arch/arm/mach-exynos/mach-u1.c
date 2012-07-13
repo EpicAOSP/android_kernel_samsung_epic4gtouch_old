@@ -210,6 +210,10 @@ static struct wacom_g5_callbacks *wacom_callbacks;
 #include "../../../drivers/usb/gadget/s3c_udc.h"
 #endif
 
+#ifdef CONFIG_KEXEC_HARDBOOT
+#include <asm/kexec.h>
+#endif
+
 /* Following are default values for UCON, ULCON and UFCON UART registers */
 #define SMDKC210_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
 				 S3C2410_UCON_RXILEVEL |	\
@@ -6759,15 +6763,19 @@ static struct s5p_platform_cec hdmi_cec_data __initdata = {
 };
 #endif
 
-#ifdef CONFIG_ANDROID_RAM_CONSOLE
 static void __init smdkc210_reserve(void)
 {
+#ifdef CONFIG_ANDROID_RAM_CONSOLE
 	if (memblock_remove(RAM_CONSOLE_START, RAM_CONSOLE_SIZE) == 0) {
 		ram_console_resource[0].start = RAM_CONSOLE_START;
 		ram_console_resource[0].end   = RAM_CONSOLE_START+RAM_CONSOLE_SIZE-1;
 	}
-}
 #endif
+
+#ifdef CONFIG_KEXEC_HARDBOOT
+	memblock_remove(KEXEC_HB_PAGE_ADDR, SZ_4K);
+#endif
+}
 
 #if defined(CONFIG_S5P_MEM_CMA)
 static void __init exynos4_cma_region_reserve(struct cma_region *regions_normal,
@@ -7399,9 +7407,7 @@ static void __init exynos_init_reserve(void)
 MACHINE_START(SMDKC210, MODEL_NAME)
 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
 	.boot_params	= S5P_PA_SDRAM + 0x100,
-#ifdef CONFIG_ANDROID_RAM_CONSOLE
 	.reserve	= smdkc210_reserve,
-#endif
 	.init_irq	= exynos4_init_irq,
 	.map_io		= smdkc210_map_io,
 	.init_machine	= smdkc210_machine_init,
