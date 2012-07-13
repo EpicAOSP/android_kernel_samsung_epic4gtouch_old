@@ -1398,7 +1398,7 @@ no_packed:
 
 static void mmc_blk_packed_hdr_wrq_prep(struct mmc_queue_req *mqrq,
 			       struct mmc_card *card,
-			       struct mmc_queue *mq
+			       struct mmc_queue *mq)
 {
 	struct mmc_blk_request *brq = &mqrq->brq;
 	struct request *req = mqrq->req;
