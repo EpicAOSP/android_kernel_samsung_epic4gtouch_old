@@ -99,7 +99,7 @@ static int brcm_init_wlan_mem(void)
 	wlan_static_scan_buf1 = kmalloc(65536, GFP_KERNEL);
 	if (!wlan_static_scan_buf1)
 		goto err_mem_alloc;
-	printk(KERN_INFO"%s: WIFI MEM Allocated\n", __func__);
+	printk("%s: WIFI MEM Allocated\n", __FUNCTION__);
 	return 0;
 
  err_mem_alloc:
