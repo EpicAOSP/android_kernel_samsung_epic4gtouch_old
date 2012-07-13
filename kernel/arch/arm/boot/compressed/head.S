@@ -298,9 +298,9 @@ wont_overwrite:
 #ifndef CONFIG_CRYPTO_FIPS
 		beq	not_relocated
 #else
-        movw r5, #:lower16:zimage_ram_base_addr
-        movt r5, #:upper16:zimage_ram_base_addr
-        beq not_relocated_copy
+		ldr	r5, =_text
+		add	r5, r5, r0
+		beq	not_relocated_copy
 #endif
 		add	r11, r11, r0
 		add	r12, r12, r0
@@ -315,9 +315,7 @@ wont_overwrite:
 		add	r3, r3, r0
 
 #ifdef CONFIG_CRYPTO_FIPS
-        movw r5, #:lower16:zimage_ram_base_addr
-        movt r5, #:upper16:zimage_ram_base_addr
-        bl copy_compressed
+		bl	copy_compressed
 #endif
 		/*
 		 * Relocate all entries in the GOT table.
@@ -417,10 +415,6 @@ LC0:		.word	LC0			@ r1
 		.word	_got_end		@ ip
 		.word	.L_user_stack_end	@ sp
 		.size	LC0, . - LC0
-
-#ifdef CONFIG_CRYPTO_FIPS
-        .equ   zimage_ram_base_addr, FIPS_KERNEL_RAM_BASE
-#endif
 
 #ifdef CONFIG_ARCH_RPC
 		.globl	params
