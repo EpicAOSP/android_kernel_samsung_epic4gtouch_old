@@ -505,4 +505,3 @@ static inline unsigned int mmc_host_clk_rate(struct mmc_host *host)
        return host->ios.clock;
 }
 #endif
-#endif /* LINUX_MMC_HOST_H */
