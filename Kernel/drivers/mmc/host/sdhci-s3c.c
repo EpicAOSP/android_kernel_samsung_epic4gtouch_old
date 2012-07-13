@@ -383,12 +383,16 @@ static void sdhci_s3c_notify_change(struct platform_device *dev, int state)
 		spin_lock_irqsave(&host->lock, flags);
 		if (state) {
 			dev_dbg(&dev->dev, "card inserted.\n");
+			pr_info("%s: card inserted.\n",
+							mmc_hostname(host->mmc));
 			host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
 #ifdef CONFIG_MACH_MIDAS_01_BD
 			sdhci_s3c_vtf_on_off(1);
 #endif
 		} else {
 			dev_dbg(&dev->dev, "card removed.\n");
+			pr_info("%s: card removed.\n",
+							mmc_hostname(host->mmc));
 			host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
 #ifdef CONFIG_MACH_MIDAS_01_BD
 			sdhci_s3c_vtf_on_off(0);
@@ -611,9 +615,6 @@ static int __devinit sdhci_s3c_probe(struct platform_device *pdev)
 	 * SDHCI block, or a missing configuration that needs to be set. */
 	host->quirks |= SDHCI_QUIRK_NO_BUSY_IRQ;
 
-	/* This host supports the Auto CMD12 */
-	host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
-
 	if (pdata->cd_type == S3C_SDHCI_CD_NONE)
 		host->quirks |= SDHCI_QUIRK_BROKEN_CARD_DETECTION;
 
@@ -812,19 +813,21 @@ static int __devexit sdhci_s3c_remove(struct platform_device *pdev)
 static int sdhci_s3c_suspend(struct platform_device *dev, pm_message_t pm)
 {
 	struct sdhci_host *host = platform_get_drvdata(dev);
+	int ret = 0;
 
-	sdhci_suspend_host(host, pm);
+	ret = sdhci_suspend_host(host, pm);
 
 #ifdef CONFIG_MACH_MIDAS_01_BD
 	/* turn vdd_tflash off */
 	sdhci_s3c_vtf_on_off(0);
 #endif
-	return 0;
+	return ret;
 }
 
 static int sdhci_s3c_resume(struct platform_device *dev)
 {
 	struct sdhci_host *host = platform_get_drvdata(dev);
+	int ret = 0;
 
 #if defined(CONFIG_WIMAX_CMC)/* && defined(CONFIG_TARGET_LOCALE_NA)*/
 
@@ -839,7 +842,9 @@ static int sdhci_s3c_resume(struct platform_device *dev)
 		sdhci_s3c_vtf_on_off(0);
 
 #endif
-	sdhci_resume_host(host);
+
+	ret = sdhci_resume_host(host);
+
 #if defined(CONFIG_WIMAX_CMC)/* && defined(CONFIG_TARGET_LOCALE_NA)*/
 
 	if (pdata->enable_intr_on_resume) {
@@ -849,7 +854,7 @@ static int sdhci_s3c_resume(struct platform_device *dev)
 		sdhci_writel(host, ier, SDHCI_SIGNAL_ENABLE);
 	}
 #endif
-	return 0;
+	return ret;
 }
 
 #else

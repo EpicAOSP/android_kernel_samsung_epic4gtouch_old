@@ -124,9 +124,11 @@ struct dw_mci {
 	struct mmc_data		*data;
 	struct clk          *hclk;
 	struct clk          *cclk;
+	bool				prv_err;
 
 	/* DMA interface members*/
 	int			use_dma;
+	int			using_dma;
 
 	dma_addr_t		sg_dma;
 	void			*sg_cpu;
@@ -152,17 +154,11 @@ struct dw_mci {
 	u32			current_speed;
 	u32			num_slots;
 	u32			fifoth_val;
+	u16			verid;
+	u16			data_offset;
 	struct platform_device	*pdev;
 	struct dw_mci_board	*pdata;
 	struct dw_mci_slot	*slot[MAX_MCI_SLOTS];
-
-	/* IP version control */
-	u32			data_addr;
-	u32			hold_bit;
-
-	/* Phase Shift Value */
-	u32			sdr_timing;
-	u32			ddr_timing;
 
 	/* FIFO push and pull */
 	int			fifo_depth;
@@ -198,6 +194,13 @@ struct dw_mci_dma_ops {
 /* Unreliable card detection */
 #define DW_MCI_QUIRK_BROKEN_CARD_DETECTION	BIT(3)
 
+enum dw_mci_cd_types {
+		DW_MCI_CD_INTERNAL,  /* use mmc internal CD line */
+		DW_MCI_CD_EXTERNAL,  /* use external callback */
+		DW_MCI_CD_GPIO,      /* use external gpio pin for CD line */
+		DW_MCI_CD_NONE,      /* no CD line, use polling to detect card */
+		DW_MCI_CD_PERMANENT, /* no CD line, card permanently wired to host */
+};
 
 struct dma_pdata;
 
@@ -239,6 +242,27 @@ struct dw_mci_board {
 	int (*get_ocr)(u32 slot_id);
 	int (*get_bus_wd)(u32 slot_id);
 	void (*cfg_gpio)(int width);
+	void (*set_io_timing)(void *data, unsigned char timing);
+
+	/* Phase Shift Value */
+	unsigned int sdr_timing;
+	unsigned int ddr_timing;
+
+	/* cd_type: Type of Card Detection method (see cd_types enum above) */
+
+	enum dw_mci_cd_types cd_type;
+
+	/* ext_cd_cleanup: Cleanup external card detect subsystem.
+	* ext_cd_init: Initialize external card detect subsystem.
+	*  »   »       notify_func argument is a callback to the dwmci driver
+	*  »   »       that triggers the card detection event. Callback arguments:
+	* »    »       dev is pointer to platform device of the host controller,
+	*»     »       state is new state of the card (0 - removed, 1 - inserted).
+	*/
+
+	int (*ext_cd_init)(void (*notify_func)(struct platform_device *, int state));
+	int (*ext_cd_cleanup)(void (*notify_func)(struct platform_device *,int state));
+
 	/*
 	 * Enable power to selected slot and set voltage to desired level.
 	 * Voltage levels are specified using MMC_VDD_xxx defines defined

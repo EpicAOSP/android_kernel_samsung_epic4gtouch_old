@@ -214,19 +214,21 @@ static void __mmc_start_req(struct mmc_host *host, struct mmc_request *mrq)
 	}
 
 #if (defined(CONFIG_MIDAS_COMMON) && !defined(CONFIG_EXYNOS4_DEV_DWMCI)) || \
-	defined(CONFIG_MACH_U1)
+	defined(CONFIG_MACH_U1) || defined(CONFIG_MACH_SLP_NAPLES)
+#ifndef CONFIG_MMC_POLLING_WAIT_CMD23
+
 	if(mrq->sbc) {
-                struct mmc_request tmp_mrq;
+		struct mmc_request tmp_mrq;
 
-                memcpy(&tmp_mrq, mrq, sizeof(struct mmc_request));
+		memcpy(&tmp_mrq, mrq, sizeof(struct mmc_request));
 
-                /* send cmd 23 first */
-                mrq->cmd = mrq->sbc;
-                mrq->data = 0;
-                mmc_start_request(host, mrq);
+		/* send cmd 23 first */
+		mrq->cmd = mrq->sbc;
+		mrq->data = 0;
+		mmc_start_request(host, mrq);
 
-                /* wait for cmd 23 complete */
-                wait_for_completion(&mrq->completion);
+		/* wait for cmd 23 complete */
+		wait_for_completion(&mrq->completion);
 
 		/* check that cmd23 is done well */
 		if(mrq->cmd->error) {
@@ -236,15 +238,16 @@ static void __mmc_start_req(struct mmc_host *host, struct mmc_request *mrq)
 			mrq->data = tmp_mrq.data;
 			return;
 		}
-                /* send R/W command */
-                init_completion(&mrq->completion);
-                mrq->sbc = mrq->cmd;
-                mrq->cmd = tmp_mrq.cmd;
-                mrq->data = tmp_mrq.data;
-                mmc_start_request(host, mrq);
-        } else
+		/* send R/W command */
+		init_completion(&mrq->completion);
+		mrq->sbc = mrq->cmd;
+		mrq->cmd = tmp_mrq.cmd;
+		mrq->data = tmp_mrq.data;
+		mmc_start_request(host, mrq);
+	} else
 #endif
-                mmc_start_request(host, mrq);
+#endif
+		mmc_start_request(host, mrq);
 }
 
 static inline void mmc_set_ios(struct mmc_host *host);
@@ -254,11 +257,13 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 {
 	struct mmc_command *cmd;
 #if (defined(CONFIG_MIDAS_COMMON) && !defined(CONFIG_EXYNOS4_DEV_DWMCI))
+#ifndef CONFIG_MMC_POLLING_WAIT_CMD23
 	if(mrq->sbc && mrq->sbc->error) {
 		/* if an sbc error exists, do not wait completion.
 		   completion is already called.
 		   nothing to do at this condition. */
 	} else
+#endif
 #endif
 		wait_for_completion(&mrq->completion);
 
@@ -272,8 +277,7 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 	if (((host->card) && mmc_card_mmc(host->card) && \
 		(host->caps & MMC_CAP_NONREMOVABLE)) && \
 		(mrq->cmd->error == -ENOTRECOVERABLE || \
-		((mrq->cmd->opcode == 17 || mrq->cmd->opcode == 18 || \
-		mrq->cmd->opcode == 24 || mrq->cmd->opcode == 25) && \
+		((mrq->cmd->opcode == 17 || mrq->cmd->opcode == 18 && \
 		((mrq->data->error) || mrq->cmd->error || \
 		(mrq->sbc && mrq->sbc->error))))) {
 		int rt_err = -1,count = 3;
@@ -329,8 +333,11 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 static void mmc_pre_req(struct mmc_host *host, struct mmc_request *mrq,
 		 bool is_first_req)
 {
-	if (host->ops->pre_req)
+	if (host->ops->pre_req) {
+		mmc_host_clk_hold(host);
 		host->ops->pre_req(host, mrq, is_first_req);
+		mmc_host_clk_release(host);
+	}
 }
 
 /**
@@ -345,8 +352,11 @@ static void mmc_pre_req(struct mmc_host *host, struct mmc_request *mrq,
 static void mmc_post_req(struct mmc_host *host, struct mmc_request *mrq,
 			 int err)
 {
-	if (host->ops->post_req)
+	if (host->ops->post_req) {
+		mmc_host_clk_hold(host);
 		host->ops->post_req(host, mrq, err);
+		mmc_host_clk_release(host);
+	}
 }
 
 /**
@@ -384,7 +394,8 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
 				mmc_post_req(host, areq->mrq, -EINVAL);
 
 			host->areq = NULL;
-#ifdef CONFIG_MACH_M0	/* dh0421.hwang */
+#if defined(CONFIG_MACH_M0) || defined(CONFIG_MACH_P4NOTE)
+			/* dh0421.hwang */
 			/*
 			 * dh0421.hwang
 			 * It's for Engineering DEBUGGING only
@@ -576,9 +587,9 @@ void mmc_set_data_timeout(struct mmc_data *data, const struct mmc_card *card)
 			 * The limit is really 250 ms, but that is
 			 * insufficient for some crappy cards.
 			 */
-			limit_us = 300000;
+			limit_us = 500000;
 		else
-			limit_us = 100000;
+			limit_us = 200000;
 
 		/*
 		 * SDHC cards always use these fixed values.
@@ -661,7 +672,9 @@ int mmc_host_enable(struct mmc_host *host)
 		int err;
 
 		host->en_dis_recurs = 1;
+		mmc_host_clk_hold(host);
 		err = host->ops->enable(host);
+		mmc_host_clk_release(host);
 		host->en_dis_recurs = 0;
 
 		if (err) {
@@ -681,7 +694,9 @@ static int mmc_host_do_disable(struct mmc_host *host, int lazy)
 		int err;
 
 		host->en_dis_recurs = 1;
+		mmc_host_clk_hold(host);
 		err = host->ops->disable(host, lazy);
+		mmc_host_clk_release(host);
 		host->en_dis_recurs = 0;
 
 		if (err < 0) {
@@ -1244,8 +1259,11 @@ int mmc_set_signal_voltage(struct mmc_host *host, int signal_voltage, bool cmd11
 
 	host->ios.signal_voltage = signal_voltage;
 
-	if (host->ops->start_signal_voltage_switch)
+	if (host->ops->start_signal_voltage_switch) {
+		mmc_host_clk_hold(host);
 		err = host->ops->start_signal_voltage_switch(host, &host->ios);
+		mmc_host_clk_release(host);
+	}
 
 	return err;
 }
@@ -2376,9 +2394,12 @@ int mmc_flush_cache(struct mmc_card *card)
 			(card->ext_csd.cache_ctrl & 1)) {
 		err = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
 				EXT_CSD_FLUSH_CACHE, 1, 0);
-		if (err)
+		if (err) {
 			pr_err("%s: cache flush error %d\n",
 					mmc_hostname(card->host), err);
+			panic("[TEST] mmc%d, %s returns %d.\n",
+					host->index, __func__, err);
+		}
 	}
 
 	return err;
@@ -2442,7 +2463,35 @@ int mmc_suspend_host(struct mmc_host *host)
 		wake_unlock(&host->detect_wake_lock);
 	mmc_flush_scheduled_work();
 	if (mmc_try_claim_host(host)) {
+		u32 status;
+		u32 count=300000; /* up to 300ms */
+
+		/* if a sdmmc card exists and the card is mmc */
+		if (((host->card) && mmc_card_mmc(host->card))) {
+			int ret;
+			/* flush emmc's cache before getting suspend */
+			ret = mmc_flush_cache(host->card);
+			if (ret)
+				pr_err("%s: there is error %d while "
+				       "flushing emmc's cache\n",
+					mmc_hostname(host),ret);
+		}
 		err = mmc_cache_ctrl(host, 0);
+
+		/* to make sure that emmc is not working. should check
+		   emmc's state */
+		if (((host->card) && mmc_card_mmc(host->card))) {
+			do {
+				err = mmc_send_status(host->card, &status);
+				if (err)
+					break;
+
+				/* if it is not the first time */
+				if (count != 300000)
+					udelay(1);
+				count--;
+			} while (count && R1_CURRENT_STATE(status) == 7);
+		}
 		mmc_do_release_host(host);
 	} else {
 		err = -EBUSY;
@@ -2484,6 +2533,7 @@ int mmc_suspend_host(struct mmc_host *host)
 				host->pm_flags = 0;
 				err = 0;
 			}
+
 			mmc_do_release_host(host);
 		} else {
 			err = -EBUSY;

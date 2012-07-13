@@ -37,7 +37,7 @@
  *      [25:9] Register address
  *      [8:0] Byte/block count
  */
-
+#define R4_18V_PRESENT (1<<24)
 #define R4_MEMORY_PRESENT (1 << 27)
 
 /*
@@ -72,17 +72,20 @@
 #define  SDIO_CCCR_REV_1_00	0	/* CCCR/FBR Version 1.00 */
 #define  SDIO_CCCR_REV_1_10	1	/* CCCR/FBR Version 1.10 */
 #define  SDIO_CCCR_REV_1_20	2	/* CCCR/FBR Version 1.20 */
+#define  SDIO_CCCR_REV_3_00	3	/* CCCR/FBR Version 3.00 */
 
 #define  SDIO_SDIO_REV_1_00	0	/* SDIO Spec Version 1.00 */
 #define  SDIO_SDIO_REV_1_10	1	/* SDIO Spec Version 1.10 */
 #define  SDIO_SDIO_REV_1_20	2	/* SDIO Spec Version 1.20 */
 #define  SDIO_SDIO_REV_2_00	3	/* SDIO Spec Version 2.00 */
+#define  SDIO_SDIO_REV_3_00	4	/* SDIO Spec Version 3.00 */
 
 #define SDIO_CCCR_SD		0x01
 
 #define  SDIO_SD_REV_1_01	0	/* SD Physical Spec Version 1.01 */
 #define  SDIO_SD_REV_1_10	1	/* SD Physical Spec Version 1.10 */
 #define  SDIO_SD_REV_2_00	2	/* SD Physical Spec Version 2.00 */
+#define  SDIO_SD_REV_3_00	3	/* SD Physical Spev Version 3.00 */
 
 #define SDIO_CCCR_IOEx		0x02
 #define SDIO_CCCR_IORx		0x03
@@ -117,22 +120,46 @@
 #define SDIO_CCCR_CIS		0x09	/* common CIS pointer (3 bytes) */
 
 /* Following 4 regs are valid only if SBS is set */
-#define SDIO_CCCR_SUSPEND	0x0c
-#define SDIO_CCCR_SELx		0x0d
-#define SDIO_CCCR_EXECx		0x0e
-#define SDIO_CCCR_READYx	0x0f
+#define	SDIO_CCCR_SUSPEND	0x0c
+#define	SDIO_CCCR_SELx		0x0d
+#define	SDIO_CCCR_EXECx		0x0e
+#define	SDIO_CCCR_READYx	0x0f
 
-#define SDIO_CCCR_BLKSIZE	0x10
+#define	SDIO_CCCR_BLKSIZE	0x10
 
-#define SDIO_CCCR_POWER		0x12
+#define	SDIO_CCCR_POWER		0x12
 
-#define  SDIO_POWER_SMPC	0x01	/* Supports Master Power Control */
-#define  SDIO_POWER_EMPC	0x02	/* Enable Master Power Control */
+#define	SDIO_POWER_SMPC		0x01	/* Supports Master Power Control */
+#define	SDIO_POWER_EMPC		0x02	/* Enable Master Power Control */
 
-#define SDIO_CCCR_SPEED		0x13
+#define	SDIO_CCCR_SPEED		0x13
 
-#define  SDIO_SPEED_SHS		0x01	/* Supports High-Speed mode */
-#define  SDIO_SPEED_EHS		0x02	/* Enable High-Speed mode */
+#define	SDIO_SPEED_SHS			0x01	/* Supports High-Speed mode */
+#define	SDIO_SPEED_BSS_SHIFT	1
+#define	SDIO_SPEED_BSS_MASK		(7<<SDIO_SPEED_BSS_SHIFT)
+#define	SDIO_SPEED_SDR12		(0<<SDIO_SPEED_BSS_SHIFT)
+#define	SDIO_SPEED_SDR25		(1<<SDIO_SPEED_BSS_SHIFT)
+#define	SDIO_SPEED_SDR50		(2<<SDIO_SPEED_BSS_SHIFT)
+#define	SDIO_SPEED_SDR104		(3<<SDIO_SPEED_BSS_SHIFT)
+#define	SDIO_SPEED_DDR50		(4<<SDIO_SPEED_BSS_SHIFT)
+#define	SDIO_SPEED_EHS			SDIO_SPEED_SDR25»       /* Enable High-Speed */
+
+#define	SDIO_CCCR_UHS			0x14
+#define	SDIO_UHS_SDR50			0x01
+#define	SDIO_UHS_SDR104			0x02
+#define	SDIO_UHS_DDR50			0x04
+
+#define	SDIO_CCCR_DRIVE_STRENGTH	0x15
+#define	SDIO_SDTx_MASK				0x07
+#define	SDIO_DRIVE_SDTA				(1<<0)
+#define	SDIO_DRIVE_SDTC				(1<<1)
+#define	SDIO_DRIVE_SDTD				(1<<2)
+#define	SDIO_DRIVE_DTSx_MASK		0x03
+#define	SDIO_DRIVE_DTSx_SHIFT		4
+#define	SDIO_DTSx_SET_TYPE_B		(0 << SDIO_DRIVE_DTSx_SHIFT)
+#define	SDIO_DTSx_SET_TYPE_A		(1 << SDIO_DRIVE_DTSx_SHIFT)
+#define	SDIO_DTSx_SET_TYPE_C		(2 << SDIO_DRIVE_DTSx_SHIFT)
+#define	SDIO_DTSx_SET_TYPE_D		(3 << SDIO_DRIVE_DTSx_SHIFT)
 
 /*
  * Function Basic Registers (FBR)
