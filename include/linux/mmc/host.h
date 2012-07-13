@@ -479,8 +479,6 @@ static inline int mmc_host_cmd23(struct mmc_host *host)
 {
 	return host->caps & MMC_CAP_CMD23;
 }
-#endif
-
 static inline int mmc_boot_partition_access(struct mmc_host *host)
 {
 	return !(host->caps2 & MMC_CAP2_BOOTPART_NOACC);
@@ -504,4 +502,5 @@ static inline unsigned int mmc_host_clk_rate(struct mmc_host *host)
 {
        return host->ios.clock;
 }
+#endif
 #endif
