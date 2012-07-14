@@ -334,7 +334,7 @@ static int mmc_sdio_switch_hs(struct mmc_card *card, int enable)
 	else
 		speed &= ~SDIO_SPEED_EHS;
 
-	ret = mmc_io_rw_direct(card, 1, 0, SDIO_CCCR_SPEED, speed, NULL);
+ret = mmc_io_rw_direct(card, 1, 0, SDIO_CCCR_SPEED, speed, NULL);
 	if (ret)
 		return ret;
 
