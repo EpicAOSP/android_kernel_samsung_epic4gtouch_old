@@ -274,10 +274,10 @@ static void mmc_wait_for_req_done(struct mmc_host *host,
 
 	/* if card is mmc type and nonremovable, and there are erros after
 	   issuing r/w command, then init eMMC and mshc */
-	if (((host->card) && mmc_card_mmc(host->card) && \
+	if (((host->card) && (mmc_card_mmc(host->card)) && \
 		(host->caps & MMC_CAP_NONREMOVABLE)) && \
-		(mrq->cmd->error == -ENOTRECOVERABLE || \
-		((mrq->cmd->opcode == 17 || mrq->cmd->opcode == 18 && \
+		((mrq->cmd->error == -ENOTRECOVERABLE) || \
+		((mrq->cmd->opcode == 17 || (mrq->cmd->opcode == 18)) && \
 		((mrq->data->error) || mrq->cmd->error || \
 		(mrq->sbc && mrq->sbc->error))))) {
 		int rt_err = -1,count = 3;
