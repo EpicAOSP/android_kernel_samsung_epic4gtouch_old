@@ -341,7 +341,7 @@ ret = mmc_io_rw_direct(card, 1, 0, SDIO_CCCR_SPEED, speed, NULL);
 }
 
 /*
- * Enable SDIO/combo card's high-speed mode. Return 0/1 if [not]supported.
+ * Enable SDIO/combo card's high-speed mode. Return 0/1 if [not] supported.
  */
 static int sdio_enable_hs(struct mmc_card *card)
 {
