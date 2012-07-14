@@ -330,7 +330,7 @@ static int mmc_sdio_switch_hs(struct mmc_card *card, int enable)
 		return ret;
 
 	if (enable)
-		speed |= SDIO_SPEED_EHS;
+		 speed |= SDIO_SPEED_EHS;
 	else
 		speed &= ~SDIO_SPEED_EHS;
 
