@@ -38,7 +38,7 @@
 #endif
 
 #include "dpram.h"
-#include <mach/system.h>
+//#include <mach/system.h>
 #include <mach/sec_debug.h>
 
 /***************************************************************************/
