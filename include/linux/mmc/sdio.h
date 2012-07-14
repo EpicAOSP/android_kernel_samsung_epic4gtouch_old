@@ -142,7 +142,7 @@
 #define	SDIO_SPEED_SDR50		(2<<SDIO_SPEED_BSS_SHIFT)
 #define	SDIO_SPEED_SDR104		(3<<SDIO_SPEED_BSS_SHIFT)
 #define	SDIO_SPEED_DDR50		(4<<SDIO_SPEED_BSS_SHIFT)
-#define	SDIO_SPEED_EHS			SDIO_SPEED_SDR25»       /* Enable High-Speed */
+#define	SDIO_SPEED_EHS			SDIO_SPEED_SDR25	/* Enable High-Speed */
 
 #define	SDIO_CCCR_UHS			0x14
 #define	SDIO_UHS_SDR50			0x01
