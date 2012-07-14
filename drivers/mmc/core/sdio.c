@@ -206,7 +206,6 @@ static int sdio_read_cccr(struct mmc_card *card, u32 ocr)
 out:
 	return ret;
 }
-
 static int sdio_enable_wide(struct mmc_card *card)
 {
 	int ret;
@@ -335,7 +334,7 @@ static int mmc_sdio_switch_hs(struct mmc_card *card, int enable)
 	else
 		speed &= ~SDIO_SPEED_EHS;
 
-	ret = mmc_io_rw_direct(card, 1, 0, SDIO_CCCR_SPEED, speed, NULL);
+ret = mmc_io_rw_direct(card, 1, 0, SDIO_CCCR_SPEED, speed, NULL);
 	if (ret)
 		return ret;
 
@@ -1296,3 +1295,63 @@ err:
 	return err;
 }
 EXPORT_SYMBOL(sdio_reset_comm);
+int cmc732_sdio_reset_comm(struct mmc_card *card)
+{
+        struct mmc_host *host = card->host;
+        u32 ocr;
+        int err;
+	printk("%s():\n",__func__);
+	cmc732_sdio_reset(host);
+	err = mmc_send_io_op_cond(host, 0, &ocr);
+        if (err)
+                goto err;
+#if 1//refer to mmc_attach_sdio()
+        if (!host->index)
+                ocr |= 0x00000080; //correct cmc ocr to show support for 1.8v operation
+        host->ocr = mmc_select_voltage(host, ocr);
+        if (!host->index)
+                host->ocr = 0x8000;//lie to cmc card that 2.8v operation selected
+#else
+        host->ocr = mmc_select_voltage(host, ocr);
+#endif
+        if (!host->ocr) {
+                err = -EINVAL;
+                goto err;
+        }
+        err = mmc_send_io_op_cond(host, host->ocr, &ocr);
+        if (err)
+                goto err;
+        if (mmc_host_is_spi(host)) {
+                err = mmc_spi_set_crc(host, use_spi_crc);
+                if (err)
+                goto err;
+        }
+        if (!mmc_host_is_spi(host)) {
+                err = mmc_send_relative_addr(host, &card->rca);
+                if (err)
+                        goto err;
+                mmc_set_bus_mode(host, MMC_BUSMODE_PUSHPULL);
+        }
+        if (!mmc_host_is_spi(host)) {
+                err = mmc_select_card(card);
+                if (err)
+                        goto err;
+        }
+        err = sdio_enable_hs(card);
+        if (err)
+                goto err;
+        if (mmc_card_highspeed(card)) {
+                mmc_set_clock(host, 50000000);
+        } else {
+                mmc_set_clock(host, card->cis.max_dtr);
+        }
+        err = sdio_enable_wide(card);
+        if (err)
+                goto err;
+        return 0;
+err:
+        printk("%s: Error resetting SDIO communications (%d)\n",
+               mmc_hostname(host), err);
+        return err;
+}
+EXPORT_SYMBOL(cmc732_sdio_reset_comm);
