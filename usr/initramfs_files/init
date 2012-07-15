@@ -1,6 +1,7 @@
 #!/stage1/busybox sh
-_PATH="$PATH"
+export _PATH="$PATH"
 export PATH=/stage1
+BOOT_IMAGE=/dev/block/mmcblk0p5
 
 busybox cd /
 busybox date >>boot.txt
@@ -9,14 +10,18 @@ busybox rm init
 busybox mount -t proc proc /proc
 busybox mount -t sysfs sysfs /sys
 
-load_image=/stage1/boot.cpio
+eval $(read_boot_headers ${BOOT_IMAGE})
+
+load_offset=$boot_offset
+load_len=$boot_len
 
 if busybox grep -q bootmode=2 /proc/cmdline ; then
 	# recovery boot
-	load_image=/stage1/recovery.cpio
+	load_offset=$recovery_offset
+	load_len=$recovery_len
 fi
 
-busybox cpio -i < ${load_image}
+busybox dd bs=512 if=${BOOT_IMAGE} skip=$load_offset count=$load_len | busybox zcat | busybox cpio -i
 
 busybox umount /sys
 busybox umount /proc
