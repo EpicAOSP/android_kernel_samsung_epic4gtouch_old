@@ -3565,10 +3565,10 @@ static int dpram_resume(struct platform_device *dev)
     dpram_wait_wakeup_start(); // wait the CP ack 0xCE
 
 	//To configure AP_WAKE normal interrupt
-        disable_irq_wake(dpram_wakeup_irq);
-        enable_irq(dpram_wakeup_irq);
+        /*disable_irq_wake(dpram_wakeup_irq);
+        enable_irq(dpram_wakeup_irq);*/
 
-    check_miss_interrupt();
+    /*check_miss_interrupt();*/
     return 0;
 }
 
