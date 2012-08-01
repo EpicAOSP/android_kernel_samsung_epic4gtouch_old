@@ -1,70 +1,84 @@
 /*
- * download.c
+ * Copyright (C) 2011 Samsung Electronics.
  *
- * Firmware download (host booting) functions and definitions
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
  */
 #include "headers.h"
 #include "download.h"
-#include "firmware.h"
 
+#include <linux/firmware.h>
 #include <linux/vmalloc.h>
 
-struct image_data g_wimax_image;
-
-int load_wimax_image(int mode)
+int load_wimax_image(int mode, struct net_adapter *adapter)
 {
-	struct file	*fp;
-	int		read_size = 0;
+	const struct firmware *fw = NULL;
+	int ret = STATUS_SUCCESS;
+	struct device *dev;
 
-	if (mode == AUTH_MODE)
-		fp = klib_fopen(WIMAX_LOADER_PATH, O_RDONLY, 0);	/* download mode */
-	else
-		fp = klib_fopen(WIMAX_IMAGE_PATH, O_RDONLY, 0);		/* wimax mode */
-
-	if (fp) {
-		if (g_wimax_image.data == NULL)	{	/* check already allocated */
-			g_wimax_image.data = (u_char *)vmalloc(MAX_WIMAXFW_SIZE);
-
-			if (!g_wimax_image.data) {
-				dump_debug("Error: Memory alloc failure");
-				klib_fclose(fp);
-				return STATUS_UNSUCCESSFUL;
-			}
-		}
-
-		memset(g_wimax_image.data, 0, MAX_WIMAXFW_SIZE);
-		read_size = klib_flen_fcopy(g_wimax_image.data, MAX_WIMAXFW_SIZE, fp);
-
-		g_wimax_image.size = read_size;
-		g_wimax_image.address = CMC732_WIMAX_ADDRESS;
-		g_wimax_image.offset = 0;
-
-		klib_fclose(fp);
-	} else {
-		dump_debug("Error: WiMAX image file open failed");
+	if (!adapter || !adapter->func) {
+		pr_err("%s: device is NULL, can't load firmware\n", __func__);
 		return STATUS_UNSUCCESSFUL;
 	}
 
-	return STATUS_SUCCESS;
-}
+	dev = &adapter->func->dev;
 
-void unload_wimax_image(void)
-{
-	if (g_wimax_image.data != NULL) {
-		dump_debug("Delete the Image Loaded");
-		vfree(g_wimax_image.data);
-		g_wimax_image.data = NULL;
+	if (request_firmware(&fw, (mode == AUTH_MODE) ?
+				WIMAX_LOADER_PATH : WIMAX_IMAGE_PATH, dev)) {
+		dev_err(dev, "%s: Can't open firmware file\n", __func__);
+		return STATUS_UNSUCCESSFUL;
 	}
+
+	if (adapter->wimax_image.data && adapter->wimax_image.size < fw->size) {
+		vfree(adapter->wimax_image.data);
+		adapter->wimax_image.data = NULL;
+	}
+
+	if (!adapter->wimax_image.data)
+		adapter->wimax_image.data = vmalloc(fw->size);
+
+	if (!adapter->wimax_image.data) {
+		dev_err(dev, "%s: Can't allocate %d bytes of memory for "
+					"firmware\n", __func__, fw->size);
+		ret = STATUS_UNSUCCESSFUL;
+		goto err_vmalloc;
+	}
+	memcpy(adapter->wimax_image.data, fw->data, fw->size);
+
+	adapter->wimax_image.size = fw->size;
+	adapter->wimax_image.address = CMC732_WIMAX_ADDRESS;
+	adapter->wimax_image.offset = 0;
+
+err_vmalloc:
+	release_firmware(fw);
+	return ret;
 }
 
-u_char send_cmd_packet(struct net_adapter *adapter, u_short cmd_id)
+void unload_wimax_image(struct net_adapter *adapter)
+{
+	if (adapter->wimax_image.data == NULL)
+		return;
+
+	pr_debug("Delete the Image Loaded");
+	vfree(adapter->wimax_image.data);
+	adapter->wimax_image.data = NULL;
+}
+
+u8 send_cmd_packet(struct net_adapter *adapter, u16 cmd_id)
 {
 	struct hw_packet_header	*pkt_hdr;
 	struct wimax_msg_header	*msg_hdr;
-	u_char			tx_buf[CMD_MSG_TOTAL_LENGTH];
+	u8			tx_buf[CMD_MSG_TOTAL_LENGTH];
 	int			status = 0;
-	u_int			offset;
-	u_int			size;
+	u32			offset;
+	u32			size;
 
 	pkt_hdr = (struct hw_packet_header *)tx_buf;
 	pkt_hdr->id0 = 'W';
@@ -80,23 +94,26 @@ u_char send_cmd_packet(struct net_adapter *adapter, u_short cmd_id)
 	size = CMD_MSG_TOTAL_LENGTH;
 
 	status = sd_send(adapter, tx_buf, size);
+
+
 	if (status != STATUS_SUCCESS) {
-		/* crc error or data error - set PCWRT '1' & send current type A packet again */
-		dump_debug("hwSdioWrite : crc or data error");
+		/* crc error or data error -
+		   set PCWRT '1' & send current type A packet again */
+		pr_debug("hwSdioWrite : crc or data error");
 		return status;
 	}
 	return status;
 }
 
-u_char send_image_info_packet(struct net_adapter *adapter, u_short cmd_id)
+u8 send_image_info_packet(struct net_adapter *adapter, u16 cmd_id)
 {
 	struct hw_packet_header	*pkt_hdr;
 	struct wimax_msg_header	*msg_hdr;
-	u_int			image_info[4];
-	u_char			tx_buf[IMAGE_INFO_MSG_TOTAL_LENGTH];
+	u32			image_info[4];
+	u8			tx_buf[IMAGE_INFO_MSG_TOTAL_LENGTH];
 	int			status;
-	u_int			offset;
-	u_int			size;
+	u32			offset;
+	u32			size;
 
 	pkt_hdr = (struct hw_packet_header *)tx_buf;
 	pkt_hdr->id0 = 'W';
@@ -110,38 +127,42 @@ u_char send_image_info_packet(struct net_adapter *adapter, u_short cmd_id)
 	msg_hdr->length = be32_to_cpu(IMAGE_INFO_MSG_LENGTH);
 
 	image_info[0] = 0;
-	image_info[1] = be32_to_cpu(g_wimax_image.size);
-	image_info[2] = be32_to_cpu(g_wimax_image.address);
+	image_info[1] = be32_to_cpu(adapter->wimax_image.size);
+	image_info[2] = be32_to_cpu(adapter->wimax_image.address);
 	image_info[3] = 0;
 
 	offset += sizeof(struct wimax_msg_header);
 	memcpy(&(tx_buf[offset]), image_info, sizeof(image_info));
 
 	size = IMAGE_INFO_MSG_TOTAL_LENGTH;
+
 	status = sd_send(adapter, tx_buf, size);
 
 	if (status != STATUS_SUCCESS) {
-		/* crc error or data error - set PCWRT '1' & send current type A packet again */
-		dump_debug("hwSdioWrite : crc error");
+		/*
+		* crc error or data error -
+		*  set PCWRT '1' & send current type A packet again
+		*/
+		pr_debug("hwSdioWrite : crc error");
 		return status;
 	}
 	return status;
 }
 
-u_char send_image_data_packet(struct net_adapter *adapter, u_short cmd_id)
+u8 send_image_data_packet(struct net_adapter *adapter, u16 cmd_id)
 {
 	struct hw_packet_header		*pkt_hdr;
 	struct image_data_payload	*pImageDataPayload;
 	struct wimax_msg_header		*msg_hdr;
-	u_char				*tx_buf = NULL;
-	int				status;
-	u_int				len;
-	u_int				offset;
-	u_int				size;
+	u8				*tx_buf = NULL;
+	int					status;
+	u32				len;
+	u32				offset;
+	u32				size;
 
-	tx_buf = (u_char *)kmalloc(MAX_IMAGE_DATA_MSG_LENGTH, GFP_KERNEL);
+	tx_buf = kmalloc(MAX_IMAGE_DATA_MSG_LENGTH, GFP_KERNEL);
 	if (tx_buf == NULL) {
-		dump_debug("MALLOC FAIL!!");
+		pr_debug("MALLOC FAIL!!");
 		return -1;
 	}
 
@@ -154,17 +175,19 @@ u_char send_image_data_packet(struct net_adapter *adapter, u_short cmd_id)
 	msg_hdr->type = be16_to_cpu(ETHERTYPE_DL);
 	msg_hdr->id = be16_to_cpu(cmd_id);
 
-	if (g_wimax_image.offset < (g_wimax_image.size - MAX_IMAGE_DATA_LENGTH))
+	if (adapter->wimax_image.offset <
+			(adapter->wimax_image.size - MAX_IMAGE_DATA_LENGTH))
 		len = MAX_IMAGE_DATA_LENGTH;
 	else
-		len = g_wimax_image.size - g_wimax_image.offset;
+		len = adapter->wimax_image.size - adapter->wimax_image.offset;
 
 	offset += sizeof(struct wimax_msg_header);
 	pImageDataPayload = (struct image_data_payload *)(tx_buf + offset);
-	pImageDataPayload->offset = be32_to_cpu(g_wimax_image.offset);
+	pImageDataPayload->offset = be32_to_cpu(adapter->wimax_image.offset);
 	pImageDataPayload->size = be32_to_cpu(len);
 
-	memcpy(pImageDataPayload->data, g_wimax_image.data + g_wimax_image.offset, len);
+	memcpy(pImageDataPayload->data,
+		adapter->wimax_image.data + adapter->wimax_image.offset, len);
 
 	size = len + 8; /* length of Payload offset + length + data */
 	pkt_hdr->length = be16_to_cpu(CMD_MSG_TOTAL_LENGTH + size);
@@ -175,53 +198,18 @@ u_char send_image_data_packet(struct net_adapter *adapter, u_short cmd_id)
 	status = sd_send(adapter, tx_buf, size);
 
 	if (status != STATUS_SUCCESS) {
-		/* crc error or data error - set PCWRT '1' & send current type A packet again */
-		dump_debug("hwSdioWrite : crc error");
+		/* crc error or data error -
+		* set PCWRT '1' & send current type A packet again
+		*/
+		pr_debug("hwSdioWrite : crc error");
 		kfree(tx_buf);
 		return status;
 	}
 
-	g_wimax_image.offset += len;
+	adapter->wimax_image.offset += len;
 
 	kfree(tx_buf);
 
 	return status;
 }
 
-/* used only during firmware download */
-u_int sd_send(struct net_adapter *adapter, u_char *buffer, u_int len)
-{
-	int	nRet = 0;
-
-	int nWriteIdx;
-
-	len += (len & 1) ? 1 : 0;
-
-	if (adapter->halted || adapter->removed) {
-		dump_debug("Halted Already");
-		return STATUS_UNSUCCESSFUL;
-	}
-
-	sdio_claim_host(adapter->func);
-	hwSdioWriteBankIndex(adapter, &nWriteIdx, &nRet);
-
-	if(nRet || (nWriteIdx < 0) )
-		return STATUS_UNSUCCESSFUL;
-
-	sdio_writeb(adapter->func, (nWriteIdx + 1) % 15, SDIO_H2C_WP_REG, NULL);
-
-	nRet = sdio_memcpy_toio(adapter->func, SDIO_TX_BANK_ADDR+(SDIO_BANK_SIZE * nWriteIdx)+4, buffer, len);
-
-	if (nRet < 0) {
-		dump_debug("sd_send : error in sending packet!! nRet = %d",nRet);
-	}
-
-	nRet = sdio_memcpy_toio(adapter->func, SDIO_TX_BANK_ADDR + (SDIO_BANK_SIZE * nWriteIdx), &len, 4);
-
-	if (nRet < 0) {
-		dump_debug("sd_send : error in writing bank length!! nRet = %d",nRet);
-	}
-	sdio_release_host(adapter->func);
-
-	return nRet;
-}

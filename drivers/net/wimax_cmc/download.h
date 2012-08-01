@@ -1,7 +1,15 @@
 /*
- * download.h
+ * Copyright (C) 2011 Samsung Electronics.
  *
- * Firmware download (host booting) functions and definitions
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
  */
 #ifndef _WIMAX_DOWNLOAD_H__
 #define _WIMAX_DOWNLOAD_H__
@@ -16,7 +24,7 @@
 #define MAX_IMAGE_DATA_LENGTH		3564
 #define MAX_IMAGE_DATA_MSG_LENGTH	4096
 
-#define FWDOWNLOAD_TIMEOUT		12000
+#define FWDOWNLOAD_TIMEOUT		5
 #define MAX_WIMAXFW_SIZE		2100000
 
 /* used for host boot (firmware download) */
@@ -31,26 +39,18 @@ enum {
 	MSG_RUN_RESP		= 0x6014
 };
 
-struct image_data {
-	u_int	size;
-	u_int	address;
-	u_int	offset;
-	struct mutex	lock;
-	u_char	*data;
-};
-
 struct image_data_payload {
-	u_int	offset;
-	u_int	size;
-	u_char	data[MAX_IMAGE_DATA_LENGTH];
+	u32	offset;
+	u32	size;
+	u8	data[MAX_IMAGE_DATA_LENGTH];
 };
 
-int load_wimax_image(int mode);
-void unload_wimax_image(void);
+int load_wimax_image(int mode, struct net_adapter *adapter);
+void unload_wimax_image(struct net_adapter *adapter);
 
-u_char send_image_info_packet(struct net_adapter *adapter, u_short cmd_id);
-u_char send_image_data_packet(struct net_adapter *adapter, u_short cmd_id);
-u_char send_cmd_packet(struct net_adapter *adapter, u_short cmd_id);
-u_int sd_send(struct net_adapter *adapter, u_char *buffer, u_int len);
+u8 send_image_info_packet(struct net_adapter *adapter, u16 cmd_id);
+u8 send_image_data_packet(struct net_adapter *adapter, u16 cmd_id);
+u8 send_cmd_packet(struct net_adapter *adapter, u16 cmd_id);
+u32 sd_send(struct net_adapter *adapter, u8 *buffer, u32 len);
 
 #endif	/* _WIMAX_DOWNLOAD_H__ */

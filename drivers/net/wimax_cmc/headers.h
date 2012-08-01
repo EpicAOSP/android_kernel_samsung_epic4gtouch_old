@@ -1,16 +1,26 @@
 /*
- * headers.h
+ * Copyright (C) 2011 Samsung Electronics.
  *
- * Global definitions and fynctions
+ * This software is licensed under the terms of the GNU General Public
+ * License version 2, as published by the Free Software Foundation, and
+ * may be copied, distributed, and modified under those terms.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
  */
 #ifndef _WIMAX_HEADERS_H
 #define _WIMAX_HEADERS_H
 
 #include <linux/kernel.h>
+#include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/init.h>
+#include <linux/gpio.h>
 #include <linux/delay.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -19,98 +29,57 @@
 #include <linux/mmc/sdio_ids.h>
 #include <linux/mmc/sdio_func.h>
 #include <asm/byteorder.h>
-#include <asm/uaccess.h>
+#include <linux/uaccess.h>
 #include <linux/wakelock.h>
 #include <linux/wimax/samsung/wimax732.h>
-#include "buffer.h"
+
 #include "wimax_sdio.h"
 
-#define WIMAXMAC_TXT_PATH	"/efs/WiMAXMAC.txt"
-#define WIMAX_IMAGE_PATH	"/system/etc/wimaxfw.bin"
-#define WIMAX_LOADER_PATH	"/system/etc/wimaxloader.bin"
-#define WIMAX_BOOTIMAGE_PATH	"/system/etc/wimax_boot.bin"
+#define WIMAX_IMAGE_PATH	"wimaxfw.bin"
+#define WIMAX_LOADER_PATH	"wimaxloader.bin"
 
 #define STATUS_SUCCESS			((u_long)0x00000000L)
-#define STATUS_PENDING			((u_long)0x00000103L)	/* The operation that was requested is pending completion */
+/* The operation that was requested is pending completion */
+#define STATUS_PENDING			((u_long)0x00000103L)
 #define STATUS_RESOURCES		((u_long)0x00001003L)
 #define STATUS_RESET_IN_PROGRESS	((u_long)0xc001000dL)
 #define STATUS_DEVICE_FAILED		((u_long)0xc0010008L)
 #define STATUS_NOT_ACCEPTED		((u_long)0x00010003L)
 #define STATUS_FAILURE			((u_long)0xC0000001L)
-#define STATUS_UNSUCCESSFUL		((u_long)0xC0000002L)	/* The requested operation was unsuccessful */
+/* The requested operation was unsuccessful */
+#define STATUS_UNSUCCESSFUL		((u_long)0xC0000002L)
 #define STATUS_CANCELLED		((u_long)0xC0000003L)
 
-#ifndef TRUE_FALSE_
-#define TRUE_FALSE_
-enum BOOL {
-	FALSE,
-	TRUE
-};
-#endif
-
-#define HARDWARE_USE_ALIGN_HEADER
-
-#define dump_debug(args...)	\
-{	\
-	printk(KERN_ALERT"\x1b[1;33m[WiMAX] ");	\
-	printk(args);	\
-	printk("\x1b[0m\n");	\
-}
-
-
-/* external functions & variables */
-extern void set_wimax_pm(void(*suspend)(void), void(*resume)(void));
-extern void unset_wimax_pm(void);
-extern int cmc732_sdio_reset_comm(struct mmc_card *card);
-extern u_int system_rev;
-
-/* receive.c functions */
-u_int process_sdio_data(struct net_adapter *adapter, void *buffer, u_long length, long Timeout);
-
 /* control.c functions */
-u_int control_send(struct net_adapter *adapter, void *buffer, u_long length);
-void control_recv(struct net_adapter   *adapter, void *buffer, u_long length);
-u_int control_init(struct net_adapter *adapter);
+u32 control_send(struct net_adapter *adapter, void *buffer, u32 length);
+void control_recv(struct net_adapter   *adapter, void *buffer, u32 length);
+u32 control_init(struct net_adapter *adapter);
 void control_remove(struct net_adapter *adapter);
 
-struct process_descriptor *process_by_id(struct net_adapter *adapter, u_int id);
-struct process_descriptor *process_by_type(struct net_adapter *adapter, u_short type);
-void remove_process(struct net_adapter *adapter, u_int id);
+struct process_descriptor *process_by_id(struct net_adapter *adapter,
+		u32 id);
+struct process_descriptor *process_by_type(struct net_adapter *adapter,
+		u16 type);
+void remove_process(struct net_adapter *adapter, u32 id);
 
-u_long buffer_count(struct list_head ListHead);
-struct buffer_descriptor *buffer_by_type(struct list_head ListHead, u_short type);
-void dump_buffer(const char *desc, u_char *buffer, u_int len);
+u32 buffer_count(struct list_head ListHead);
+struct buffer_descriptor *buffer_by_type(struct net_adapter *adapter,
+		u16 type);
 
 /* hardware.c functions */
-void switch_eeprom_ap(void);
-void switch_eeprom_wimax(void);
-void switch_usb_ap(void);
-void switch_usb_wimax(void);
-void display_gpios(void);	/* display GPIO status used by WiMAX module */
-void switch_uart_ap(void);
-void switch_uart_wimax(void);
-void hw_init_gpios(void);
-void hw_deinit_gpios(void);
 
-u_int sd_send(struct net_adapter *adapter, u_char *buffer, u_int len);
-u_int sd_send_data(struct net_adapter *adapter, struct buffer_descriptor *dsc);
-u_int hw_send_data(struct net_adapter *adapter, void *buffer, u_long length,bool);
-void hw_return_packet(struct net_adapter *adapter, u_short type);
+u32 hw_send_data(struct net_adapter *adapter,
+		void *buffer, u32 length);
+void hw_return_packet(struct net_adapter *adapter, u16 type);
 
-void s3c_bat_use_wimax(int onoff);
+int wimax_hw_start(struct net_adapter *adapter);
+int wimax_hw_stop(struct net_adapter *adapter);
+int wimax_hw_init(struct net_adapter *adapter);
+void wimax_hw_remove(struct net_adapter *adapter);
+int wimax_hw_get_mac_address(void *data);
 
-int gpio_wimax_poweron (void);
-int gpio_wimax_poweroff (void);
-
-int hw_start(struct net_adapter *adapter);
-int hw_stop(struct net_adapter *adapter);
-int hw_init(struct net_adapter *adapter);
-void hw_remove(struct net_adapter *adapter);
-void hw_get_mac_address(void *data);
-int con0_poll_thread(void *data);
-void hw_transmit_thread(struct work_struct *work);
-void adapter_interrupt(struct sdio_func *func);
-/* structures for global access */
-extern struct net_adapter *g_adapter;
+int cmc732_receive_thread(void *data);
+int cmc732_send_thread(void *data);
 
 #endif	/* _WIMAX_HEADERS_H */
+
