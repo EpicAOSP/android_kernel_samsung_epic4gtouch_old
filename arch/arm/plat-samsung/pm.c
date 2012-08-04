@@ -18,6 +18,7 @@
 #include <linux/delay.h>
 #include <linux/serial_core.h>
 #include <linux/io.h>
+#include <linux/power/charger-manager.h>
 
 #include <asm/cacheflush.h>
 #include <mach/hardware.h>
@@ -26,86 +27,15 @@
 #include <plat/regs-serial.h>
 #include <mach/regs-clock.h>
 #include <mach/regs-irq.h>
-#include <asm/fiq_glue.h>
 #include <asm/irq.h>
 
 #include <plat/pm.h>
-#include <plat/irq-eint-group.h>
 #include <mach/pm-core.h>
 
 /* for external use */
+unsigned long s3c_suspend_wakeup_stat;
 
 unsigned long s3c_pm_flags;
-
-/* ---------------------------------------------- */
-extern unsigned int pm_debug_scratchpad;
-#include <linux/slab.h>
-#include <linux/debugfs.h>
-#include <linux/uaccess.h>
-#include <linux/module.h>
-
-#define PMSTATS_MAGIC "*PM*DEBUG*STATS*"
-
-struct pmstats {
-	char magic[16];
-	unsigned sleep_count;
-	unsigned wake_count;
-	unsigned sleep_freq;
-	unsigned wake_freq;
-};
-
-static struct pmstats *pmstats;
-static struct pmstats *pmstats_last;
-
-static ssize_t pmstats_read(struct file *file, char __user *buf,
-			    size_t len, loff_t *offset)
-{
-	if (*offset != 0)
-		return 0;
-	if (len > 4096)
-		len = 4096;
-
-	if (copy_to_user(buf, file->private_data, len))
-		return -EFAULT;
-
-	*offset += len;
-	return len;
-}
-
-static int pmstats_open(struct inode *inode, struct file *file)
-{
-	file->private_data = inode->i_private;
-	return 0;
-}
-
-static const struct file_operations pmstats_ops = {
-	.owner = THIS_MODULE,
-	.read = pmstats_read,
-	.open = pmstats_open,
-};
-
-void __init pmstats_init(void)
-{
-	pr_info("pmstats at %08x\n", pm_debug_scratchpad);
-	if (pm_debug_scratchpad)
-		pmstats = ioremap(pm_debug_scratchpad, 4096);
-	else
-		pmstats = kzalloc(4096, GFP_ATOMIC);
-
-	if (!memcmp(pmstats->magic, PMSTATS_MAGIC, 16)) {
-		pmstats_last = kzalloc(4096, GFP_ATOMIC);
-		if (pmstats_last)
-			memcpy(pmstats_last, pmstats, 4096);
-	}
-
-	memset(pmstats, 0, 4096);
-	memcpy(pmstats->magic, PMSTATS_MAGIC, 16);
-
-	debugfs_create_file("pmstats", 0444, NULL, pmstats, &pmstats_ops);
-	if (pmstats_last)
-		debugfs_create_file("pmstats_last", 0444, NULL, pmstats_last, &pmstats_ops);
-}
-/* ---------------------------------------------- */
 
 /* Debug code:
  *
@@ -125,7 +55,9 @@ void s3c_pm_dbg(const char *fmt, ...)
 	vsprintf(buff, fmt, va);
 	va_end(va);
 
+#ifdef CONFIG_DEBUG_LL
 	printascii(buff);
+#endif
 }
 
 static inline void s3c_pm_debug_init(void)
@@ -135,7 +67,7 @@ static inline void s3c_pm_debug_init(void)
 }
 
 #else
-#define s3c_pm_debug_init() do { } while(0)
+#define s3c_pm_debug_init() do { } while (0)
 
 #endif /* CONFIG_SAMSUNG_PM_DEBUG */
 
@@ -257,8 +189,17 @@ void s3c_pm_do_save(struct sleep_save *ptr, int count)
 
 void s3c_pm_do_restore(struct sleep_save *ptr, int count)
 {
-	for (; count > 0; count--, ptr++)
+	for (; count > 0; count--, ptr++) {
+#if defined(CONFIG_CPU_EXYNOS4210)
+		S3C_PMDBG("restore %p (restore %08lx, was %08x)\n",
+			  ptr->reg, ptr->val, __raw_readl(ptr->reg));
+#else
+		printk(KERN_DEBUG "restore %p (restore %08lx, was %08x)\n",
+		       ptr->reg, ptr->val, __raw_readl(ptr->reg));
+#endif
+
 		__raw_writel(ptr->val, ptr->reg);
+	}
 }
 
 /**
@@ -291,16 +232,16 @@ static void __maybe_unused s3c_pm_show_resume_irqs(int start,
 	which &= ~mask;
 
 	for (i = 0; i <= 31; i++) {
-		if (which & (1L<<i)) {
+		if (which & (1L<<i))
 			S3C_PMDBG("IRQ %d asserted at resume\n", start+i);
-		}
 	}
 }
-
 
 void (*pm_cpu_prep)(void);
 void (*pm_cpu_sleep)(void);
 void (*pm_cpu_restore)(void);
+int (*pm_prepare)(void);
+void (*pm_finish)(void);
 
 #define any_allowed(mask, allow) (((mask) & (allow)) != (allow))
 
@@ -337,9 +278,9 @@ static int s3c_pm_enter(suspend_state_t state)
 	/* save all necessary core registers not covered by the drivers */
 
 	s3c_pm_save_gpios();
+	s3c_pm_saved_gpios();
 	s3c_pm_save_uarts();
 	s3c_pm_save_core();
-
 
 	/* set the irq configuration for wake */
 
@@ -360,38 +301,30 @@ static int s3c_pm_enter(suspend_state_t state)
 
 	s3c_pm_check_store();
 
-	/* clear wakeup_stat register for next wakeup reason */
-	__raw_writel(__raw_readl(S5P_WAKEUP_STAT), S5P_WAKEUP_STAT);
-
 	/* send the cpu to sleep... */
 
 	s3c_pm_arch_stop_clocks();
+
+	printk(KERN_ALERT "PM: SLEEP\n");
 
 	/* s3c_cpu_save will also act as our return point from when
 	 * we resume as it saves its own register state and restores it
 	 * during the resume.  */
 
-	pmstats->sleep_count++;
-	pmstats->sleep_freq = __raw_readl(S5P_CLK_DIV0);
 	s3c_cpu_save(0, PLAT_PHYS_OFFSET - PAGE_OFFSET);
-	pmstats->wake_count++;
-	pmstats->wake_freq = __raw_readl(S5P_CLK_DIV0);
 
 	/* restore the cpu state using the kernel's cpu init code. */
 
 	cpu_init();
 
-	fiq_glue_resume();
-	local_fiq_enable();
-
 	s3c_pm_restore_core();
 	s3c_pm_restore_uarts();
 	s3c_pm_restore_gpios();
-	s5pv210_restore_eint_group();
+	s3c_pm_restored_gpios();
 
 	s3c_pm_debug_init();
 
-        /* restore the system state */
+	/* restore the system state */
 
 	if (pm_cpu_restore)
 		pm_cpu_restore();
@@ -417,20 +350,46 @@ static int s3c_pm_prepare(void)
 {
 	/* prepare check area if configured */
 
+	disable_hlt();
 	s3c_pm_check_prepare();
+
+	if (pm_prepare)
+		pm_prepare();
+
 	return 0;
 }
 
 static void s3c_pm_finish(void)
 {
+	if (pm_finish)
+		pm_finish();
+
 	s3c_pm_check_cleanup();
+	enable_hlt();
 }
+
+#if defined(CONFIG_CHARGER_MANAGER)
+static bool s3c_cm_suspend_again(void)
+{
+	bool ret;
+
+	if (!is_charger_manager_active())
+		return false;
+
+	ret = cm_suspend_again();
+
+	return ret;
+}
+#endif
 
 static const struct platform_suspend_ops s3c_pm_ops = {
 	.enter		= s3c_pm_enter,
 	.prepare	= s3c_pm_prepare,
 	.finish		= s3c_pm_finish,
 	.valid		= suspend_valid_only_mem,
+#if defined(CONFIG_CHARGER_MANAGER)
+	.suspend_again	= s3c_cm_suspend_again,
+#endif
 };
 
 /* s3c_pm_init
@@ -442,8 +401,7 @@ static const struct platform_suspend_ops s3c_pm_ops = {
 
 int __init s3c_pm_init(void)
 {
-	printk("S3C Power Management, Copyright 2004 Simtec Electronics\n");
-	pmstats_init();
+	printk(KERN_INFO "S3C Power Management, Copyright 2004 Simtec Electronics\n");
 
 	suspend_set_ops(&s3c_pm_ops);
 	return 0;

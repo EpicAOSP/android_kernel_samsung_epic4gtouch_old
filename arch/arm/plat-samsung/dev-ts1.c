@@ -1,4 +1,4 @@
-/* linux/arch/arm/mach-s3c64xx/dev-ts.c
+/* linux/arch/arm/plat-samsung/dev-ts1.c
  *
  * Copyright (c) 2008 Simtec Electronics
  *	http://armlinux.simtec.co.uk/
@@ -25,26 +25,36 @@
 
 static struct resource s3c_ts_resource[] = {
 	[0] = {
-		.start = SAMSUNG_PA_ADC,
-		.end   = SAMSUNG_PA_ADC + SZ_256 - 1,
+		.start = SAMSUNG_PA_ADC1,
+		.end   = SAMSUNG_PA_ADC1 + SZ_256 - 1,
 		.flags = IORESOURCE_MEM,
 	},
 	[1] = {
-		.start = IRQ_TC,
-		.end   = IRQ_TC,
+		.start = IRQ_PEN1,
+		.end   = IRQ_PEN1,
 		.flags = IORESOURCE_IRQ,
 	},
 };
 
-struct platform_device s3c_device_ts = {
+struct platform_device s3c_device_ts1 = {
 	.name		= "s3c64xx-ts",
-	.id		= 0,
+	.id		= 1,
 	.num_resources	= ARRAY_SIZE(s3c_ts_resource),
 	.resource	= s3c_ts_resource,
 };
 
-void __init s3c24xx_ts_set_platdata(struct s3c2410_ts_mach_info *pd)
+void __init s3c24xx_ts1_set_platdata(struct s3c2410_ts_mach_info *pd)
 {
-	s3c_set_platdata(pd, sizeof(struct s3c2410_ts_mach_info),
-			 &s3c_device_ts);
+	struct s3c2410_ts_mach_info *npd;
+
+	if (!pd) {
+		printk(KERN_ERR "%s: no platform data\n", __func__);
+		return;
+	}
+
+	npd = kmemdup(pd, sizeof(struct s3c2410_ts_mach_info), GFP_KERNEL);
+	if (!npd)
+		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+
+	s3c_device_ts1.dev.platform_data = npd;
 }

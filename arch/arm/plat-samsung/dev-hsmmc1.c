@@ -65,6 +65,7 @@ void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
 	set->ext_cd_cleanup = pd->ext_cd_cleanup;
 	set->ext_cd_gpio = pd->ext_cd_gpio;
 	set->ext_cd_gpio_invert = pd->ext_cd_gpio_invert;
+	set->pm_flags = pd->pm_flags;
 
 	if (pd->max_width)
 		set->max_width = pd->max_width;
@@ -76,10 +77,4 @@ void s3c_sdhci1_set_platdata(struct s3c_sdhci_platdata *pd)
 		set->host_caps |= pd->host_caps;
 	if (pd->clk_type)
 		set->clk_type = pd->clk_type;
-	if (pd->built_in)
-		set->built_in = pd->built_in;
-	if (pd->must_maintain_clock)
-		set->must_maintain_clock = pd->must_maintain_clock;
-	if (pd->enable_intr_on_resume)
-		set->enable_intr_on_resume = pd->enable_intr_on_resume;
 }

@@ -1,7 +1,6 @@
-/* arch/arm/plat-samsung/include/plat/regs-otg.h
+/* linux/arch/arm/plat-samsung/include/plat/regs-otg.h
  *
- * Copyright (c) 2009 Samsung Electronics Co., Ltd.
- * 	Kyoungil Kim <ki0351.kim@samsung.com>
+ * Copyright (C) 2004 Herbert Poetzl <herbert@13thfloor.at>
  *
  * This include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -13,14 +12,14 @@
 #define __ASM_ARCH_REGS_USB_OTG_HS_H
 
 /* USB2.0 OTG Controller register */
-#define S3C_USBOTG_PHYREG(x)		((x) + S3C_VA_OTGSFR)
+#define S3C_USBOTG_PHYREG(x)		((x) + S3C_VA_HSPHY)
 #define S3C_USBOTG_PHYPWR		S3C_USBOTG_PHYREG(0x0)
 #define S3C_USBOTG_PHYCLK		S3C_USBOTG_PHYREG(0x4)
 #define S3C_USBOTG_RSTCON		S3C_USBOTG_PHYREG(0x8)
-#define S3C_USBOTG_PHYTUNE		S3C_USBOTG_PHYREG(0x24)
+#define S3C_USBOTG_PHY1CON		S3C_USBOTG_PHYREG(0x34)
 
 /* USB2.0 OTG Controller register */
-#define S3C_USBOTGREG(x) ((x) + S3C_VA_OTG)
+#define S3C_USBOTGREG(x) (x)
 /*============================================================================================== */
 	/* Core Global Registers */
 #define S3C_UDC_OTG_GOTGCTL		S3C_USBOTGREG(0x000)		/* OTG Control & Status */
@@ -62,7 +61,6 @@
 #define S3C_UDC_OTG_HCINTMSK0		S3C_USBOTGREG(0x50C)		/* Host Channel-0 Interrupt Mask */
 #define S3C_UDC_OTG_HCTSIZ0		S3C_USBOTGREG(0x510)		/* Host Channel-0 Transfer Size */
 #define S3C_UDC_OTG_HCDMA0		S3C_USBOTGREG(0x514)		/* Host Channel-0 DMA Address */
-
 
 /*============================================================================================== */
 /* Device Mode Registers */
@@ -121,7 +119,7 @@
 /* S3C_UDC_OTG_GOTGCTL */
 #define B_SESSION_VALID			(0x1<<19)
 #define A_SESSION_VALID			(0x1<<18)
-#define SESSION_REQ			(0x1<<1)
+
 /* S3C_UDC_OTG_GAHBCFG */
 #define PTXFE_HALF			(0<<8)
 #define PTXFE_ZERO			(1<<8)
@@ -139,7 +137,6 @@
 
 /* S3C_UDC_OTG_GRSTCTL */
 #define AHB_MASTER_IDLE			(1u<<31)
-#define HCLK_SOFT_RESET			(0x1<<1)
 #define CORE_SOFT_RESET			(0x1<<0)
 
 /* S3C_UDC_OTG_GINTSTS/S3C_UDC_OTG_GINTMSK core interrupt register */
@@ -157,8 +154,8 @@
 #define INT_SOF				(0x1<<3)
 #define INT_DEV_MODE			(0x0<<0)
 #define INT_HOST_MODE			(0x1<<1)
-#define	INT_GOUTNakEff			(0x01<<7)
-#define	INT_GINNakEff			(0x01<<6)
+#define INT_GOUTNakEff			(0x01<<7)
+#define INT_GINNakEff			(0x01<<6)
 
 #define FULL_SPEED_CONTROL_PKT_SIZE	8
 #define FULL_SPEED_BULK_PKT_SIZE	64
@@ -166,10 +163,17 @@
 #define HIGH_SPEED_CONTROL_PKT_SIZE	64
 #define HIGH_SPEED_BULK_PKT_SIZE	512
 
+#ifdef CONFIG_CPU_S5P6450
 #define RX_FIFO_SIZE			(4096>>2)
 #define NPTX_FIFO_START_ADDR		RX_FIFO_SIZE
 #define NPTX_FIFO_SIZE			(4096>>2)
-#define PTX_FIFO_SIZE			(1024>>1)
+#define PTX_FIFO_SIZE			(1520>>2)
+#else
+#define RX_FIFO_SIZE			(4096>>2)
+#define NPTX_FIFO_START_ADDR		RX_FIFO_SIZE
+#define NPTX_FIFO_SIZE			(4096>>2)
+#define PTX_FIFO_SIZE			(1024>>2)
+#endif
 
 /* Enumeration speed */
 #define USB_HIGH_30_60MHZ		(0x0<<1)
@@ -193,12 +197,6 @@
 #define TEST_SE0_NAK_MODE		(0x3<<4)
 #define TEST_PACKET_MODE		(0x4<<4)
 #define TEST_FORCE_ENABLE_MODE		(0x5<<4)
-#define REMOTE_WAKEUP			(0x1<<0)
-
-/* S3C_UDC_OTG_DSTS device status register */
-#define SOFFN_MASK			(0x3fff << 8)
-#define SOFFN_SHIFT			(8)
-#define USB_SUSPEND			(0x1<<0)
 
 /* S3C_UDC_OTG_DAINT device all endpoint interrupt register */
 #define DAINT_OUT_BIT			(16)
@@ -220,6 +218,7 @@
 #define DEPCTL_ISO_TYPE			(0x1<<18)
 #define DEPCTL_BULK_TYPE		(0x2<<18)
 #define DEPCTL_INTR_TYPE		(0x3<<18)
+#define DEPCTL_NAKSTS                   (0x1<<17)
 #define DEPCTL_USBACTEP			(0x1<<15)
 #define DEPCTL_NEXT_EP_BIT		(11)
 #define DEPCTL_MPS_BIT			(0)
@@ -253,8 +252,8 @@
 #define DEPTSIZ_PKT_CNT_BIT 		(19)
 #define DEPTSIZ_XFER_SIZE_BIT		(0)
 
-#define	DEPTSIZ_SETUP_PKCNT_1		(1<<29)
-#define	DEPTSIZ_SETUP_PKCNT_2		(2<<29)
-#define	DEPTSIZ_SETUP_PKCNT_3		(3<<29)
+#define DEPTSIZ_SETUP_PKCNT_1		(1<<29)
+#define DEPTSIZ_SETUP_PKCNT_2		(2<<29)
+#define DEPTSIZ_SETUP_PKCNT_3		(3<<29)
 
 #endif

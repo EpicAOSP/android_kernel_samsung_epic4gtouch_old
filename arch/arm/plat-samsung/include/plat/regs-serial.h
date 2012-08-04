@@ -53,8 +53,6 @@
 #define S3C2410_UERSTAT	  (0x14)
 #define S3C2410_UFSTAT	  (0x18)
 #define S3C2410_UMSTAT	  (0x1C)
-#define S3C2410_UDIVSLOT  (0x2C)
-#define S3C2410_UINTMSK   (0x38)
 
 #define S3C2410_LCON_CFGMASK	  ((0xF<<3)|(0x3))
 
@@ -196,11 +194,6 @@
 #define S3C64XX_UINTSP		0x34
 #define S3C64XX_UINTM		0x38
 
-/* S5V210 interrupt registers. */
-#define S5P_UINTP		0x30
-#define S5P_UINTSP		0x34
-#define S5P_UINTM		0x38
-
 /* Following are specific to S5PV210 */
 #define S5PV210_UCON_CLKMASK	(1<<10)
 #define S5PV210_UCON_PCLK	(0<<10)
@@ -262,15 +255,13 @@ struct s3c24xx_uart_clksrc {
  * arch/arm/mach-s3c2410/ directory.
 */
 
+struct uart_port;
+
 struct s3c2410_uartcfg {
 	unsigned char	   hwport;	 /* hardware port number */
 	unsigned char	   unused;
 	unsigned short	   flags;
-#if !defined(CONFIG_CPU_S5PV210)
 	upf_t		   uart_flags;	 /* default uart flags */
-#else
-        unsigned long	   uart_flags;      /* default uart flags */
-#endif
 
 	unsigned int	   has_fracval;
 
@@ -281,7 +272,8 @@ struct s3c2410_uartcfg {
 	struct s3c24xx_uart_clksrc *clocks;
 	unsigned int		    clocks_size;
 
-	void (*wake_peer)(struct uart_port *);
+	void	(*wake_peer)(struct uart_port *);
+	void	(*set_runstate)(int onoff);
 };
 
 /* s3c24xx_uart_devs
@@ -295,4 +287,3 @@ extern struct platform_device *s3c24xx_uart_devs[4];
 #endif /* __ASSEMBLY__ */
 
 #endif /* __ASM_ARM_REGS_SERIAL_H */
-
