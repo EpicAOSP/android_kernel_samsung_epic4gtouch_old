@@ -18,6 +18,8 @@
 #ifndef __PLAT_S3C_SDHCI_H
 #define __PLAT_S3C_SDHCI_H __FILE__
 
+#define S3C_SDHCI_PM_IGNORE_SUSPEND_RESUME  (1 << 30)
+
 struct platform_device;
 struct mmc_host;
 struct mmc_card;
@@ -72,8 +74,10 @@ struct s3c_sdhci_platdata {
 
 	char		**clocks;	/* set of clock sources */
 
+        char            *vmmc_name; /* name for regulator */
 	int		ext_cd_gpio;
 	bool		ext_cd_gpio_invert;
+	unsigned int    pm_flags;
 	int	(*ext_cd_init)(void (*notify_func)(struct platform_device *,
 						   int state));
 	int	(*ext_cd_cleanup)(void (*notify_func)(struct platform_device *,
