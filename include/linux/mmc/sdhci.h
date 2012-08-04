@@ -21,7 +21,7 @@ struct sdhci_host {
 	/* Data set by hardware interface driver */
 	const char *hw_name;	/* Hardware bus name */
 
-	unsigned int quirks;	/* Deviations from spec. */
+	u64 quirks;	/* Deviations from spec. */
 
 /* Controller doesn't honor resets unless we touch the clock register */
 #define SDHCI_QUIRK_CLOCK_BEFORE_RESET			(1<<0)
@@ -87,6 +87,8 @@ struct sdhci_host {
 #define SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC		(1<<30)
 /* The read-only detection via SDHCI_PRESENT_STATE register is unstable */
 #define SDHCI_QUIRK_UNSTABLE_RO_DETECT			(1<<31)
+/* Controller must maintain clock when no activity */
+#define SDHCI_QUIRK_MUST_MAINTAIN_CLOCK			(1ULL<<32)
 
 	int irq;		/* Device IRQ */
 	void __iomem *ioaddr;	/* Mapped address */
@@ -94,7 +96,6 @@ struct sdhci_host {
 	const struct sdhci_ops *ops;	/* Low level hw interface */
 
 	struct regulator *vmmc;	/* Power regulator */
-	char *vmmc_name;	/* Power regulator's name */
 
 	/* Internal data */
 	struct mmc_host *mmc;	/* MMC structure */
@@ -146,6 +147,7 @@ struct sdhci_host {
 	struct tasklet_struct finish_tasklet;
 
 	struct timer_list timer;	/* Timer for timeouts */
+	struct timer_list busy_check_timer;
 
 	unsigned int caps;	/* Alternative capabilities */
 
